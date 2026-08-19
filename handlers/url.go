@@ -4,6 +4,7 @@ import (
 		"encoding/json"
 		"errors"
 		"net/http"
+		"net/url"
 
 		"github.com/go-chi/chi/v5"
 		"gorm.io/gorm"
@@ -25,6 +26,28 @@ type ShortenResponse struct {
 	LongURL string `json: "long_url"`
 }
 
+func validateURL(raw string) error {
+	if raw == "" {
+		return errors.New("url is required")
+	}
+
+	u, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return errors.New("url is not well-formed")
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("url must use http or https")
+	}
+
+	if u.Host == "" {
+		return errors.New("url must include a host")
+	}
+	return nil
+}
+
+
+
 func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 	var req ShortenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -32,14 +55,14 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 		return 
 	}
 
-	if req.URL == "" {
-		http.Error(w, "URL is required", http.StatusBadRequest)
+	if err := validateURL(req.URL); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	
 	url, err := shortner.CreateShortURL(h.DB, req.URL)
 	if err != nil {
-		http.Error(w, "failed to create a short url", http.StatusBadRequest)
+		http.Error(w, "failed to create a short url", http.StatusInternalServerError)
 		return
 	}
 
