@@ -14,7 +14,8 @@ import (
 
 
 type Handler struct {
-	DB *gorm.DB
+	DB    *gorm.DB
+	Cache *shortner.Cache
 }
 
 type ShortenRequest struct {
@@ -79,7 +80,7 @@ func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 
-	url, err := shortner.GetByShortCode(h.DB, code)
+	url, err := shortner.GetByShortCodeCached(h.DB, h.Cache, code)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound){
 			http.Error(w, "short url not found", http.StatusNotFound)

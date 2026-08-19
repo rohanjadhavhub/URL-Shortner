@@ -10,24 +10,28 @@ import(
 	"url-shortener/db"
 	"url-shortener/models"
 	"url-shortener/handlers"
+	"url-shortener/shortner"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config:", err)
+		log.Fatalf("Failed to load config:%v", err)
 	}
 
 	database, err := db.ConnectDB(cfg.DatabaseURL, cfg.Env)
 	if err != nil {
-		log.Fatalf("Failed to connect DB:", err)
+		log.Fatalf("Failed to connect DB:%v", err)
 	}
 
 	if err := database.AutoMigrate(&models.URL{}); err != nil {
     	log.Fatalf("failed to migrate database: %v", err)
 	}
 
-	h := &handlers.Handler{DB: database}
+	h := &handlers.Handler{
+			DB: database,
+			Cache: shortner.NewCache(),
+		}
 
 	r := chi.NewRouter()
 	r.Post("/shorten", h.Shorten)
