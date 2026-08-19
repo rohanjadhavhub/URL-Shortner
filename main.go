@@ -6,6 +6,7 @@ import(
 
 	"url-shortener/config"
 	"url-shortener/db"
+	"url-shortener/models"
 )
 
 func main() {
@@ -18,6 +19,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect DB:", err)
 	}
+
+	if err := database.AutoMigrate(&models.URL{}); err != nil {
+    log.Fatalf("failed to migrate database: %v", err)
+}
 
 	_ = database
 
