@@ -1,14 +1,15 @@
 package main
 
 import(
-	"fmt"
 	"log"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
 
 	"url-shortener/config"
 	"url-shortener/db"
 	"url-shortener/models"
-	"url-shortener/shortner"
-
+	"url-shortener/handlers"
 )
 
 func main() {
@@ -26,17 +27,14 @@ func main() {
     	log.Fatalf("failed to migrate database: %v", err)
 	}
 
-	url, err := shortner.CreateShortURL(database, "https://github.com/Anshgrover23/vouch")
-	if err != nil {
-		log.Fatalf("failed to create short url: %v", err)
-	}
-	fmt.Printf("Created: %s -> %s (id=%d)\n", url.ShortURL, url.LongURL, url.ID)
+	h := &handlers.Handler{DB: database}
 
-	found, err := shortner.GetByShortCode(database, url.ShortURL)
-	if err != nil {
-		log.Fatalf("lookup failed: %v", err)
-	}
-	fmt.Printf("Found: %s -> %s\n", found.ShortURL, found.LongURL)
+	r := chi.NewRouter()
+	r.Post("/shorten", h.Shorten)
+	r.Get("/{code}", h.Redirect)
 
-	fmt.Printf("Starting in %s mode on port %s\n", cfg.Env, cfg.Port)
+	log.Printf("starting server in %s mode on port %s\n", cfg.Env, cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, r); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
 }
