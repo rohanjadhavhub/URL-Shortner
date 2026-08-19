@@ -1,24 +1,24 @@
 package shortner
 
 import (
-	"math/rand"
-	"errors"
-	"log"
-	"fmt"
-	"sync"
+		"math/rand"
+		"errors"
+		"log"
+		"fmt"
 
-	"github.com/jackc/pgx/v5/pgconn"
-	"gorm.io/gorm"
+	lru "github.com/hashicorp/golang-lru/v2"
+		"github.com/jackc/pgx/v5/pgconn"
+		"gorm.io/gorm"
 
-	"url-shortener/models"
+		"url-shortener/models"
 
 )
 
 type Cache struct {
-	mu    sync.RWMutex
-	items map[string]string
+	lru *lru.Cache[string, string]
 }
 
+const defaultCacheSize = 1000
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 const (
@@ -27,22 +27,20 @@ const (
 )
 
 func NewCache() *Cache {
-	return &Cache{
-		items: make(map[string]string),
+	c, err := lru.New[string, string](defaultCacheSize)
+	if err != nil {
+		panic(err)
 	}
+
+	return &Cache{lru: c}
 }
 
 func (c *Cache) Get(code string) (string, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	longURL, ok := c.items[code]
-	return longURL, ok
+	return c.lru.Get(code)
 }
 
 func (c *Cache) Set(code, longURL string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.items[code] = longURL
+	c.lru.Add(code, longURL)
 }
 
 func GenerateCode(length int) string{
@@ -91,7 +89,7 @@ func GetByShortCodeCached(db *gorm.DB, cache *Cache, code string) (*models.URL, 
 	}
 
 	log.Printf("cache MISS for code=%s", code)
-	
+
 	url, err := GetByShortCode(db, code)
 	if err != nil {
 		return nil, err
